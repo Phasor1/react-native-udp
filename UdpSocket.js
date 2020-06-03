@@ -74,22 +74,27 @@ export default class UdpSocket extends EventEmitter {
     this._debug('binding, address:', address, 'port:', port)
     const bindArgs = [this._id, port, address]
     if (Platform.OS === 'ios') bindArgs.push({ reusePort: this.reusePort })
-    Sockets.bind(...bindArgs, function(err, addr) {
-      err = normalizeError(err)
-      if (err) {
-        // questionable: may want to self-destruct and
-        // force user to create a new socket
-        self._state = STATE.UNBOUND
-        self._debug('failed to bind', err)
-        if (callback) callback(err)
-        return self.emit('error', err)
-      }
-      self._debug('bound to address:', addr.address, 'port:', addr.port)
-      self._address = addr.address
-      self._port = addr.port
-      self._state = STATE.BOUND
-      self.emit('listening')
-    })
+    function bindSocket(){
+      Sockets.bind(...bindArgs, function(err, addr) {
+        err = normalizeError(err)
+        if (err) {
+          // questionable: may want to self-destruct and
+          // force user to create a new socket
+          self._state = STATE.UNBOUND
+          self._debug('failed to bind', err)
+          bindSocket();
+          if (callback) callback(err)
+          return self.emit('error', err)
+        }
+
+        self._debug('bound to address:', addr.address, 'port:', addr.port)
+        self._address = addr.address
+        self._port = addr.port
+        self._state = STATE.BOUND
+        self.emit('listening')
+      })
+    }
+    bindSocket();
   }
 
   close(callback = noop) {
